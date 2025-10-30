@@ -1,18 +1,48 @@
-from fastapi import FastAPI, Form
+from fastapi import FastAPI
+from pydantic import BaseModel
 import joblib
+import os
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
-app = FastAPI(title="Business Sentiment Analysis API", description="Predict sentiment of business reviews", version="1.0")
+app = FastAPI(title="Business Sentiment Analysis API")
+
+# Enable CORS (helps frontend apps call your API)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Load model and vectorizer
-model = joblib.load("models/sentiment_model.pkl")
-vectorizer = joblib.load("models/vectorizer.pkl")
+MODEL_PATH = "models/sentiment_model.pkl"
+VECTORIZER_PATH = "models/vectorizer.pkl"
 
+model = joblib.load(MODEL_PATH)
+vectorizer = joblib.load(VECTORIZER_PATH)
+
+
+# Input format
+class Review(BaseModel):
+    text: str
+
+
+# Root route
 @app.get("/")
-def read_root():
-    return {"message": "Welcome to the Business Sentiment API! Visit /docs for Swagger UI."}
+def home():
+    """Redirects to the API docs."""
+    return RedirectResponse(url="/docs")
 
+
+# Prediction endpoint
 @app.post("/predict")
-def predict_sentiment(text: str = Form(...)):
-    X = vectorizer.transform([text])
-    prediction = model.predict(X)[0]
+def predict_sentiment(review: Review):
+    """Predict sentiment from text."""
+    text_vector = vectorizer.transform([review.text])
+    prediction = model.predict(text_vector)[0]
     return {"sentiment": prediction}
+
+
+# Run locally: uvicorn src.app:app --reload
